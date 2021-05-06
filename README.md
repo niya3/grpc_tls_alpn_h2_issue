@@ -25,39 +25,70 @@ docker run -ti -v $PWD:/dir python:3.9.4-buster bash
 cd /dir
 ```
 
-## dependecies
+## prerequisites
 
 ```bash
 make deps
 ```
 
-## Python client OK run
+### with h2, via tls.Listener
 
 ```bash
-make server
-make client
-# server: 2021/05/04 12:32:02 Run server with h2
-#
-# client: Received message: %s confirmation: "Credited 0"
+$ make server-h2-listener
+2021/05/06 15:49:11 TLS config includes h2
+2021/05/06 15:49:11 Pass TLS config via tls.NewListener
+2021/05/06 15:49:18 Request: 0
+
+$ make client
+Received message: %s confirmation: "Credited 0"
 ```
 
-## Python client failed run
+### without h2, via tls.Listener
+
 
 ```bash
-make broken-server
-make client
+$ make server-listener
+2021/05/06 15:49:52 TLS config doesn't include h2
+2021/05/06 15:49:52 Pass TLS config via tls.NewListener
 
-# server: 2021/05/04 12:33:36 Run server WITHOUT h2
-#
-# client: I0504 12:33:38.260658538   52867 subchannel.cc:1012]         Connect failed: {"created":"@1620120818.260611055","description":"Cannot check peer: missing selected ALPN property.","file":"src/core/lib/security/security_connector/ssl_utils.cc","file_line":161}
-# client: I0504 12:33:38.260715165   52867 subchannel.cc:957]          Subchannel 0x56070f114270: Retry in 981 milliseconds
-# client: Received error: %s <_InactiveRpcError of RPC that terminated with:
-# client:         status = StatusCode.UNAVAILABLE
+$ make client
+I0506 15:49:54.290646018   61520 subchannel.cc:1012]         Connect failed: {"created":"@1620305394.290596812","description":"Cannot check peer: missing selected ALPN property.","file":"src/core/lib/security/security_connector/ssl_utils.cc","file_line":161}
+I0506 15:49:54.290681420   61520 subchannel.cc:957]          Subchannel 0x55f3d3d6d750: Retry in 973 milliseconds
+Received error: %s <_InactiveRpcError of RPC that terminated with:
+        status = StatusCode.UNAVAILABLE
+        details = "failed to connect to all addresses"
+        debug_error_string = "{"created":"@1620305394.290677436","description":"Failed to pick subchannel","file":"src/core/ext/filters/client_channel/client_channel.cc","file_line":5419,"referenced_errors":[{"created":"@1620305394.290674361","description":"failed to connect to all addresses","file":"src/core/ext/filters/client_channel/lb_policy/pick_first/pick_first.cc","file_line":397,"grpc_status":14}]}"
+>
 ```
+
+### with h2, via grpc.Creds
+
+```bash
+$ make server-h2-creds
+2021/05/06 15:50:06 TLS config includes h2
+2021/05/06 15:50:06 Pass TLS config via grpc.Creds
+2021/05/06 15:50:08 Request: 0
+
+$ make client
+Received message: %s confirmation: "Credited 0"
+```
+
+### without h2, via grpc.Creds
+
+```bash
+$ make server-creds
+2021/05/06 15:50:12 TLS config doesn't include h2
+2021/05/06 15:50:12 Pass TLS config via grpc.Creds
+2021/05/06 15:50:13 Request: 0
+
+$ make client
+Received message: %s confirmation: "Credited 0"
+```
+
 
 ## grpcurl client run
 
-Clients written in Golang succesfully connect to server regardless of server's `-with-h2` value:
+Clients written in Golang succesfully connect to server with any server's options combination:
 
 ```bash
 make go-client

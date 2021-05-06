@@ -8,11 +8,14 @@ import (
 	"log"
 	"net"
 
+	"google.golang.org/grpc/credentials"
+
 	"example.com/server/pkg/credit"
 	"google.golang.org/grpc"
 )
 
-var withH2Flag = flag.Bool("with-h2", true, "specify h2 as next proto to TLS listener")
+var withH2Flag = flag.Bool("with-h2", false, "specify h2 as next proto to TLS listener")
+var viaGrpcCreds = flag.Bool("via-grpc-creds", false, "pass TLS config via grpc.Creds when `true` or via tls.NewListener when `false`")
 
 type server struct {
 	credit.UnimplementedCreditServiceServer
@@ -31,25 +34,30 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if *withH2Flag {
-		log.Println("Run server with h2")
-
-		lis = tls.NewListener(lis, &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS13,
-			NextProtos: []string{
-				"h2", // enable ALPN needed for python grpcio client
-			},
-		})
-	} else {
-		log.Println("Run server WITHOUT h2")
-		lis = tls.NewListener(lis, &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS13,
-		})
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS13,
 	}
 
-	srv := grpc.NewServer()
+	if *withH2Flag {
+		log.Println("TLS config includes h2")
+		tlsConfig.NextProtos = []string{"h2"} // enable ALPN needed for python grpcio client
+	} else {
+		log.Println("TLS config doesn't include h2")
+	}
+
+	var opts []grpc.ServerOption
+	if *viaGrpcCreds {
+		log.Println("Pass TLS config via grpc.Creds")
+		tlsCredentials := credentials.NewTLS(tlsConfig)
+		opts = append(opts, grpc.Creds(tlsCredentials))
+
+	} else {
+		log.Println("Pass TLS config via tls.NewListener")
+		lis = tls.NewListener(lis, tlsConfig)
+	}
+
+	srv := grpc.NewServer(opts...)
 	credit.RegisterCreditServiceServer(srv, &server{})
 
 	log.Fatalln(srv.Serve(lis))

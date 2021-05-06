@@ -19,27 +19,37 @@ go.sum: go.mod
 .PHONY: server-reqs
 server-reqs: go.sum root.key root.crt pkg/credit/credit.pb.go ## Run server.
 
-.PHONY: server
-server: server-reqs
-	export PATH=$$PATH:/usr/local/go/bin && \
-		go run ./server.go
+.PHONY: server-h2-creds
+server-h2-creds: server-reqs
+	@ export PATH=$$PATH:/usr/local/go/bin && \
+		go run ./server.go -with-h2=true -via-grpc-creds=true
 
-.PHONY: broken-server
-broken-server: server-reqs
-	export PATH=$$PATH:/usr/local/go/bin && \
-		go run ./server.go -with-h2=false
+.PHONY: server-creds
+server-creds: server-reqs
+	@ export PATH=$$PATH:/usr/local/go/bin && \
+		go run ./server.go -with-h2=false -via-grpc-creds=true
+
+.PHONY: server-h2-listener
+server-h2-listener: server-reqs
+	@ export PATH=$$PATH:/usr/local/go/bin && \
+		go run ./server.go -with-h2=true -via-grpc-creds=false
+
+.PHONY: server-listener
+server-listener: server-reqs
+	@ export PATH=$$PATH:/usr/local/go/bin && \
+		go run ./server.go -with-h2=false -via-grpc-creds=false
 
 venv:
-	python -m venv venv
-	. venv/bin/activate && pip install -U setuptools grpcio-tools
+	@ python -m venv venv
+	@ . venv/bin/activate && pip install -U setuptools grpcio-tools
 
 .PHONY: client
 client: root.crt venv
-	. venv/bin/activate && GRPC_VERBOSITY=INFO GRPC_TRACE= python client.py
+	@ . venv/bin/activate && GRPC_VERBOSITY=INFO GRPC_TRACE= python client.py
 
 .PHONY: go-client
 go-client: root.crt
-	GODEBUG=x509ignoreCN=0 /tmp/grpcurl -proto ./credit.proto -cacert ./root.crt localhost:50051 credit.CreditService.Credit
+	@ GODEBUG=x509ignoreCN=0 /tmp/grpcurl -proto ./credit.proto -cacert ./root.crt localhost:50051 credit.CreditService.Credit
 
 
 .PHONY: deps
